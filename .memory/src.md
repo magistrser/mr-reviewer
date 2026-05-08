@@ -1,6 +1,6 @@
 # mr-review project memory
 
-Last revised: 2026-05-08.
+Last revised: 2026-05-09.
 
 ## Purpose
 
@@ -111,6 +111,29 @@ OpenAI-compatible server's `finish_reason`. Some local servers return `finish_re
 tool calls; treating `stop` as terminal before executing those calls causes missing artifact files such as
 translation result JSON.
 
+## Deduplication
+
+Publish-time finding deduplication intentionally does not rely on exact `dedup_key` or `rule_ids` matches. Different
+models often describe the same issue with different rule IDs, titles, or dedup suffixes. `CommentDedupPlanner`
+therefore groups candidates by target file, `focus_area`, and configured nearby-line window before asking the
+dedup agent to judge semantic equivalence from body, evidence, impact, anchors, and the underlying defect. Keep
+`dedup_key` in artifacts for traceability only.
+
+## Repo indexing and retrieval
+
+The current repo-wide catalog is intentionally not a generic search index. `RepoCatalogBuilder` writes
+`repo-catalog.json` from tracked source-like files and stores deterministic per-file metadata: language, directory
+scope, path tokens, focus areas, imports, symbols, role hints, domain terms, retrieval hints, path aliases, and
+symbol spans. `ReviewScopePlanner` reuses this catalog to enrich changed files before clustering, and
+`ReviewRetrievalPlanner` uses it to resolve bounded retrieval requests into one or a few related snippets for file
+and cluster review passes. The retrieval plans and aggregate report are persisted as review diagnostics.
+
+Probe (https://github.com/probelabs/probe) looks attractive as a search/extraction backend because it provides
+tree-sitter-aware search, symbol extraction, token budgets, JSON output, MCP/CLI/Node SDK surfaces, and optional LSP
+indexing. It should be evaluated first as an optional retrieval adapter, not as a wholesale replacement for the
+catalog. A full replacement would still need to preserve the project-specific metadata, policy behavior,
+cluster evidence, deterministic reports, offline/local constraints, and Python-only runtime expectations.
+
 ## Guardrails
 
 - Keep orchestration in `application`, not CLI/API adapters.
@@ -124,6 +147,13 @@ translation result JSON.
 - Tests for Rich live TTY output should assert `ConsoleReviewOutput` live state/sealing behavior rather than
   exact captured stdout emptiness; Rich versions differ on whether fake TTY streams receive escape-rendered frames.
 - Use `PYTHONPYCACHEPREFIX=/tmp/mr-review-pyc` during local verification to avoid writing caches into source packages.
+
+## Documentation approach
+
+`README.md` is intentionally user-first. Keep the opening sections focused on what the tool does, prerequisites,
+quick start, configuration, CLI usage, preview mode, API mode, artifacts, development checks, and troubleshooting.
+Advanced implementation details belong later in the README or in this memory file so first-time users can get to
+a successful review run without reading the full architecture history.
 
 ## CLI troubleshooting
 
