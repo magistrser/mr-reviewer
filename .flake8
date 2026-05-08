@@ -1,0 +1,6 @@
+[flake8]
+exclude = .git, __pycache__, migrations, fixtures, wsgi.py, env, .idea, manage.py,
+	managers.py, __init__.py, venv, .venv, *_tests.py,
+	python_template, .pr-review-workspaces
+max-line-length = 120
+ignore: D106, D104, D105, D107, I100, I201, D100, A003, W504, W503, E721, A005, E231, Q003

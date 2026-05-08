@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mr-review"
+version = "0.1.0"
+description = "Deterministic GitLab MR review orchestrator with CLI and FastAPI entrypoints."
+readme = "README.md"
+requires-python = ">=3.14.3"
+dependencies = [
+    "fastapi[standard]>=0.135.3",
+    "prometheus-client>=0.24.1",
+    "prompt_toolkit>=3.0.52,<4",
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
+    "rich>=14,<16",
+]
+
+[dependency-groups]
+dev = [
+    "flake8>=7.3.0",
+    "flake8-import-order>=0.19.2",
+    "mypy>=1.20.0",
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-cov>=7.1.0",
+    "types-pyyaml>=6.0.12.20250915",
+]
+
+[project.scripts]
+mr-review = "infrastructure.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["application*", "domain*", "infrastructure*", "resources*", "runtime*"]
+
+[tool.setuptools]
+py-modules = ["main", "settings"]
+
+[tool.setuptools.package-data]
+resources = ["**/*"]

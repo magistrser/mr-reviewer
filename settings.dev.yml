@@ -1,0 +1,16 @@
+api:
+  review_root: .
+  settings_path: settings.dev.yml
+  max_concurrent_jobs: 1
+
+security:
+  auth:
+    baseUrl: http://localhost:11434/v1
+
+model:
+  generationConfig:
+    timeout: 300000
+
+review:
+  parallelReviews: 1
+  parallelClusterReviews: 1

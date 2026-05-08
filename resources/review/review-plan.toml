@@ -1,0 +1,218 @@
+[language_standards]
+python = "languages/python.md"
+rust = "languages/rust.md"
+typescript = "languages/typescript.md"
+javascript = "languages/typescript.md"
+
+[[file_passes]]
+pass_id = "correctness"
+focus_area = "correctness"
+run_always = true
+goal = "Review correctness, state handling, and operational safety in the changed code."
+checks = [
+  "Boundary validation — does external input reach domain logic without validation?",
+  "Structured error responses — do changed boundaries leak raw exceptions or inconsistent response shapes?",
+  "Atomic multi-step writes — does the change split a logical write into non-atomic steps?",
+  "N+1 or loop-driven IO — does changed code perform repeated external access inside a loop?",
+  "Safe migrations or schema changes — does the change assume an unsafe rollout order or irreversible mutation?",
+  "Swallowed errors — does any changed path discard or hide failures?",
+  "Layer-boundary error context — do propagated errors lose operational context?",
+  "Resource lifecycle — are files, sockets, locks, transactions, or other resources definitely released?",
+  "Hidden effects and control flow — do simple-looking operations hide unexpected IO or mutation?",
+]
+standards = [
+  "common/reviewer-scope.md",
+  "common/core-engineering.md",
+  "common/api-and-data.md",
+  "common/error-handling.md",
+  "common/architecture-and-modularity.md",
+]
+
+[[file_passes]]
+pass_id = "security"
+focus_area = "security"
+run_focus_any = ["security", "api_boundary", "data_integrity"]
+goal = "Review security-sensitive code paths and externally influenced boundaries."
+checks = [
+  "Authn/authz at boundaries — is every changed externally reachable boundary protected?",
+  "No hardcoded secrets — did the change introduce credentials, tokens, keys, or secret-like literals?",
+  "Parameterized queries and escaping — does changed code concatenate SQL, shell, HTML, or other context-sensitive output unsafely?",
+  "No internal-error leakage — does the change surface stack details or privileged operational context to callers?",
+  "Boundary validation for untrusted input — is externally controlled data validated before policy, persistence, or rendering use?",
+]
+standards = [
+  "common/reviewer-scope.md",
+  "common/security.md",
+  "common/api-and-data.md",
+  "common/error-handling.md",
+]
+
+[[file_passes]]
+pass_id = "async"
+focus_area = "async_concurrency"
+run_focus_any = ["async_concurrency"]
+goal = "Review async and concurrency behavior in the changed code."
+checks = [
+  "Blocking work in async code — does changed async code call blocking IO or CPU-heavy work directly?",
+  "Unhandled async failures — does changed code drop a future, promise, or async result without awaiting, returning, or handling failure?",
+  "Error context on async boundaries — when async work crosses a layer boundary, is failure context preserved?",
+  "Executor-safe side effects — does async code hide mutation or IO behind innocent-looking access patterns?",
+]
+standards = [
+  "common/reviewer-scope.md",
+  "common/core-engineering.md",
+  "common/error-handling.md",
+]
+include_current_language_standard = true
+
+[[file_passes]]
+pass_id = "python"
+focus_area = "python"
+run_languages = ["python"]
+goal = "Review Python-specific runtime hazards and idioms visible in the changed code."
+checks = [
+  "Mutable default arguments — does a changed function use [] , {} , or set() as a default?",
+  "Assert for runtime validation — does changed production code use assert for external or user-controlled input?",
+  "Blocking calls inside async def — does changed async Python code run blocking work directly?",
+]
+standards = ["common/reviewer-scope.md"]
+include_current_language_standard = true
+
+[[file_passes]]
+pass_id = "rust"
+focus_area = "rust"
+run_languages = ["rust"]
+goal = "Review Rust-specific panic, typing, and async hazards visible in the changed code."
+checks = [
+  "No unwrap or expect in production code — does changed non-test code introduce panic-on-error behavior?",
+  "Error context on propagated failures — does a changed boundary use ? without enough operation context?",
+  "Avoid serde_json::Value for stable domain data — does changed stable schema code use untyped JSON values?",
+  "No blocking calls inside async fn — does changed async Rust code run blocking work directly?",
+]
+standards = ["common/reviewer-scope.md"]
+include_current_language_standard = true
+
+[[file_passes]]
+pass_id = "typescript"
+focus_area = "typescript"
+run_languages = ["typescript"]
+goal = "Review TypeScript-specific boundary typing and async hazards visible in the changed code."
+checks = [
+  "Any at public boundaries — do exported signatures or boundary casts use any?",
+  "Unhandled Promise rejections — is a changed async result discarded without awaiting, returning, or handling failure?",
+  "Non-null assertion operator — does changed production code use value! where null is a real runtime possibility?",
+]
+standards = ["common/reviewer-scope.md"]
+include_current_language_standard = true
+
+[[file_passes]]
+pass_id = "javascript"
+focus_area = "javascript"
+run_languages = ["javascript"]
+goal = "Review JavaScript boundary typing and async hazards visible in the changed code."
+checks = [
+  "Boundary typing escapes — does changed code use any-like boundary escapes or unsafe casts at exported edges?",
+  "Unhandled Promise rejections — is a changed async result discarded without awaiting, returning, or handling failure?",
+  "Non-null assertion style hazards — does changed code rely on unchecked values where null or undefined is plausible?",
+]
+standards = ["common/reviewer-scope.md"]
+include_current_language_standard = true
+
+[[cluster_passes]]
+pass_id = "security"
+focus_area = "security"
+goal = "Review only cross-file defects that require reasoning across multiple changed files."
+checks = [
+  "Boundary contract mismatch — do request, response, schema, or DTO changes disagree across changed files?",
+  "Partial rename or partial rollout — did one file change a domain term, field, or invariant without all affected callers or storage layers changing with it?",
+  "Cross-layer responsibility leak — did the combined change move business logic into transport or persistence layers, or couple layers more tightly?",
+  "Data consistency drift — do migrations, repositories, services, and models imply incompatible transactional or schema behavior?",
+  "Dependency or module cycle risk — do the changed files imply a new dependency loop or an over-coupled integration point?",
+  "Security boundary consistency — do authentication, authorization, validation, and secret-handling rules stay aligned across the changed files?",
+]
+standards = [
+  "common/reviewer-scope.md",
+  "common/api-and-data.md",
+  "common/architecture-and-modularity.md",
+  "common/core-engineering.md",
+  "common/security.md",
+]
+include_language_standards = true
+
+[[cluster_passes]]
+pass_id = "api_boundary"
+focus_area = "api_boundary"
+goal = "Review only cross-file defects that require reasoning across multiple changed files."
+checks = [
+  "Boundary contract mismatch — do request, response, schema, or DTO changes disagree across changed files?",
+  "Partial rename or partial rollout — did one file change a domain term, field, or invariant without all affected callers or storage layers changing with it?",
+  "Cross-layer responsibility leak — did the combined change move business logic into transport or persistence layers, or couple layers more tightly?",
+  "Data consistency drift — do migrations, repositories, services, and models imply incompatible transactional or schema behavior?",
+  "Dependency or module cycle risk — do the changed files imply a new dependency loop or an over-coupled integration point?",
+]
+standards = [
+  "common/reviewer-scope.md",
+  "common/api-and-data.md",
+  "common/architecture-and-modularity.md",
+  "common/core-engineering.md",
+]
+include_language_standards = true
+
+[[cluster_passes]]
+pass_id = "data_integrity"
+focus_area = "data_integrity"
+goal = "Review only cross-file defects that require reasoning across multiple changed files."
+checks = [
+  "Boundary contract mismatch — do request, response, schema, or DTO changes disagree across changed files?",
+  "Partial rename or partial rollout — did one file change a domain term, field, or invariant without all affected callers or storage layers changing with it?",
+  "Cross-layer responsibility leak — did the combined change move business logic into transport or persistence layers, or couple layers more tightly?",
+  "Data consistency drift — do migrations, repositories, services, and models imply incompatible transactional or schema behavior?",
+  "Dependency or module cycle risk — do the changed files imply a new dependency loop or an over-coupled integration point?",
+]
+standards = [
+  "common/reviewer-scope.md",
+  "common/api-and-data.md",
+  "common/architecture-and-modularity.md",
+  "common/core-engineering.md",
+]
+include_language_standards = true
+
+[[cluster_passes]]
+pass_id = "async_concurrency"
+focus_area = "async_concurrency"
+goal = "Review only cross-file defects that require reasoning across multiple changed files."
+checks = [
+  "Boundary contract mismatch — do request, response, schema, or DTO changes disagree across changed files?",
+  "Partial rename or partial rollout — did one file change a domain term, field, or invariant without all affected callers or storage layers changing with it?",
+  "Cross-layer responsibility leak — did the combined change move business logic into transport or persistence layers, or couple layers more tightly?",
+  "Data consistency drift — do migrations, repositories, services, and models imply incompatible transactional or schema behavior?",
+  "Dependency or module cycle risk — do the changed files imply a new dependency loop or an over-coupled integration point?",
+  "Async and concurrency consistency — do the changed files coordinate awaiting, offloading, and failure handling consistently?",
+]
+standards = [
+  "common/reviewer-scope.md",
+  "common/api-and-data.md",
+  "common/architecture-and-modularity.md",
+  "common/core-engineering.md",
+  "common/error-handling.md",
+]
+include_language_standards = true
+
+[[cluster_passes]]
+pass_id = "architecture"
+focus_area = "architecture"
+goal = "Review only cross-file defects that require reasoning across multiple changed files."
+checks = [
+  "Boundary contract mismatch — do request, response, schema, or DTO changes disagree across changed files?",
+  "Partial rename or partial rollout — did one file change a domain term, field, or invariant without all affected callers or storage layers changing with it?",
+  "Cross-layer responsibility leak — did the combined change move business logic into transport or persistence layers, or couple layers more tightly?",
+  "Data consistency drift — do migrations, repositories, services, and models imply incompatible transactional or schema behavior?",
+  "Dependency or module cycle risk — do the changed files imply a new dependency loop or an over-coupled integration point?",
+]
+standards = [
+  "common/reviewer-scope.md",
+  "common/api-and-data.md",
+  "common/architecture-and-modularity.md",
+  "common/core-engineering.md",
+]
+include_language_standards = true

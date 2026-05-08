@@ -1,0 +1,139 @@
+.docker:
+  image: ${NEXUS_DOCKER_REGISTRY}/docker:29-cli
+  tags:
+    - k8s
+  services:
+    - name: ${NEXUS_DOCKER_REGISTRY}/docker:29-dind
+      alias: docker
+      command: ["--insecure-registry=10.0.0.17:5000"]
+      variables:
+        HEALTHCHECK_TCP_PORT: "2375"
+
+variables:
+  PROJECT_NAME: mr-review
+  DOCKER_REGISTRY: ${NEXUS_DOCKER_REGISTRY}
+  NAMESPACE: ${CI_PROJECT_NAMESPACE}/${PROJECT_NAME}
+
+  BASE_TAG: ${CI_COMMIT_REF_SLUG}
+  BASE_IMAGE: ${DOCKER_REGISTRY}/${NAMESPACE}
+
+  RELEASE_TAG: ${BASE_TAG}-${CI_COMMIT_SHORT_SHA}
+  RELEASE_IMAGE: ${CLOUD_REGISTRY}/${NAMESPACE}:${RELEASE_TAG}
+
+  LOCAL_CACHE_IMAGE: ${BASE_IMAGE}:${BASE_TAG}-build-cache
+  RELEASE_CACHE_IMAGE: ${BASE_IMAGE}:${BASE_TAG}-build-release-cache
+
+  DOCKER_TLS_CERTDIR: "" # to disable TLS for docker:dind
+  DOCKER_HOST: tcp://docker:2375
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: never
+    - if: '$GITLAB_USER_LOGIN == "ci-token-rw"'
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "push"
+
+stages:
+  - build
+  - lint
+  - test
+  - publish
+
+build:
+  extends: .docker
+  stage: build
+  before_script:
+    - docker login -u ci -p ${NEXUS_CI_PASSWORD} ${DOCKER_REGISTRY}
+  script:
+    - | 
+      docker buildx build \
+        --build-arg DOCKER_REGISTRY=${DOCKER_REGISTRY} \
+        --cache-to type=inline \
+        --cache-from type=registry,ref=${RELEASE_CACHE_IMAGE} \
+        --tag ${RELEASE_CACHE_IMAGE} \
+        --target build \
+        --push . 2>&1 | tee output.log
+    - echo RELEASE_IMAGE_DIGEST=sha256:$(grep -o 'exporting manifest list sha256:[a-f0-9]*' output.log | cut -d':' -f2 | uniq) > digests.env
+    - rm output.log
+
+    - | 
+      docker buildx build \
+        --build-arg DOCKER_REGISTRY=${DOCKER_REGISTRY} \
+        --cache-to type=inline \
+        --cache-from type=registry,ref=${RELEASE_CACHE_IMAGE} \
+        --cache-from type=registry,ref=${LOCAL_CACHE_IMAGE} \
+        --tag ${LOCAL_CACHE_IMAGE} \
+        --target pipeline \
+        --push . 2>&1 | tee output.log
+    - echo LOCAL_IMAGE_DIGEST=sha256:$(grep -o 'exporting manifest list sha256:[a-f0-9]*' output.log | cut -d':' -f2 | uniq) >> digests.env
+    - cat digests.env
+  after_script:
+    - docker logout ${DOCKER_REGISTRY}
+  artifacts:
+    reports:
+      dotenv: digests.env
+
+.base-lint:
+  image: ${LOCAL_CACHE_IMAGE}@${LOCAL_IMAGE_DIGEST}
+  stage: lint
+  needs:
+    - build
+  tags:
+    - k8s
+
+mypy:
+  extends: .base-lint
+  script:
+    mypy .
+
+flake8:
+  extends: .base-lint
+  script:
+    flake8
+
+.base-test:
+  image: ${LOCAL_CACHE_IMAGE}@${LOCAL_IMAGE_DIGEST}
+  stage: test
+  needs:
+    - build
+    - mypy
+    - flake8
+  tags:
+    - k8s
+
+test:
+  extends: .base-test
+  script:
+    - pytest -s --color=yes --junitxml=report.xml --cov=application --cov=domain --cov=infrastructure --cov-config=.coverage_conf --cov-fail-under 70
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?)\%$/'
+  artifacts:
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+
+publish-release-image:
+  extends: .docker
+  stage: publish
+  rules:
+    - if: "$CI_COMMIT_REF_SLUG =~ /(main|master)/"
+  needs:
+    - build
+    - mypy
+    - flake8
+    - test
+  before_script:
+    - docker login -u ci -p ${NEXUS_CI_PASSWORD} ${DOCKER_REGISTRY}
+    - docker login -u ci -p ${NEXUS_CI_PASSWORD} ${CLOUD_REGISTRY}
+  script:
+    - docker build
+      --build-arg DOCKER_REGISTRY=${DOCKER_REGISTRY}
+      --cache-from type=registry,ref=${RELEASE_CACHE_IMAGE}@${RELEASE_IMAGE_DIGEST}
+      --tag ${RELEASE_IMAGE}
+      --target runtime
+      --push .
+  after_script:
+    - docker logout ${DOCKER_REGISTRY}
+    - docker logout ${CLOUD_REGISTRY}
