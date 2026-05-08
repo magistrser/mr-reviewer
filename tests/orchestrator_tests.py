@@ -21,6 +21,11 @@ from domain.review.standards import ReviewStandards
 from domain.workspace import WorkspacePaths
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REVIEW_RESOURCES_DIR = PROJECT_ROOT / 'resources' / 'review'
+AGENTS_DIR = PROJECT_ROOT / 'resources' / 'agents'
+
+
 class ParseMrUrlTests(unittest.TestCase):
     def test_parses_nested_project_and_iid(self) -> None:
         project_path, mr_iid = MergeRequestUrlParser.parse(
@@ -36,8 +41,7 @@ class ParseMrUrlTests(unittest.TestCase):
 
 class ReviewTaskTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
-        resources_dir = Path('/Users/franz/review/resources/review')
-        self.resources = await ReviewStandards.load_resources(resources_dir)
+        self.resources = await ReviewStandards.load_resources(REVIEW_RESOURCES_DIR)
 
     async def test_collect_review_state_writes_existing_comment_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -585,7 +589,7 @@ class ReviewTaskTests(unittest.IsolatedAsyncioTestCase):
                 max_cluster_reviews=3,
             )
             resources = await ReviewStandards.load_resources(
-                Path('/Users/franz/review/resources/review'),
+                REVIEW_RESOURCES_DIR,
                 enabled_file_pass_ids=('correctness',),
             )
 
@@ -626,7 +630,7 @@ class ReviewTaskTests(unittest.IsolatedAsyncioTestCase):
                 max_cluster_reviews=3,
             )
             resources = await ReviewStandards.load_resources(
-                Path('/Users/franz/review/resources/review'),
+                REVIEW_RESOURCES_DIR,
                 enabled_file_pass_ids=('python',),
             )
 
@@ -641,14 +645,14 @@ class ReviewTaskTests(unittest.IsolatedAsyncioTestCase):
     async def test_load_resources_rejects_unknown_configured_file_pass_id(self) -> None:
         with self.assertRaisesRegex(ValueError, 'unknown pass ids'):
             await ReviewStandards.load_resources(
-                Path('/Users/franz/review/resources/review'),
+                REVIEW_RESOURCES_DIR,
                 enabled_file_pass_ids=('not-real',),
             )
 
     async def test_load_resources_rejects_unknown_configured_cluster_pass_id(self) -> None:
         with self.assertRaisesRegex(ValueError, 'unknown pass ids'):
             await ReviewStandards.load_resources(
-                Path('/Users/franz/review/resources/review'),
+                REVIEW_RESOURCES_DIR,
                 enabled_cluster_pass_ids=('not-real',),
             )
 
@@ -700,7 +704,7 @@ class ReviewTaskTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cluster_review_materials_can_limit_to_enabled_cluster_passes(self) -> None:
         resources = await ReviewStandards.load_resources(
-            Path('/Users/franz/review/resources/review'),
+            REVIEW_RESOURCES_DIR,
             enabled_cluster_pass_ids=('api_boundary',),
         )
         cluster = {
@@ -738,7 +742,7 @@ class ReviewTaskTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cluster_security_pass_preserves_extra_guidance(self) -> None:
         resources = await ReviewStandards.load_resources(
-            Path('/Users/franz/review/resources/review'),
+            REVIEW_RESOURCES_DIR,
             enabled_cluster_pass_ids=('security',),
         )
         cluster = {
@@ -804,7 +808,7 @@ class ReviewTaskTests(unittest.IsolatedAsyncioTestCase):
                 max_cluster_reviews=3,
             )
             resources = await ReviewStandards.load_resources(
-                Path('/Users/franz/review/resources/review'),
+                REVIEW_RESOURCES_DIR,
                 enabled_cluster_pass_ids=(),
             )
 
@@ -1069,8 +1073,8 @@ class UseCaseDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
                 agent=AgentConfig(base_url='http://localhost:1234/v1', api_key='secret', timeout_seconds=30),
                 review=ReviewConfig(
                     review_root=root,
-                    resources_dir=Path('/Users/franz/review/resources/review'),
-                    agents_dir=Path('/Users/franz/review/resources/agents'),
+                    resources_dir=REVIEW_RESOURCES_DIR,
+                    agents_dir=AGENTS_DIR,
                     max_retrieved_chars_per_task=160,
                 ),
             )
@@ -1234,8 +1238,8 @@ class UseCaseDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
                 agent=AgentConfig(base_url='http://localhost:1234/v1', api_key='secret', timeout_seconds=30),
                 review=ReviewConfig(
                     review_root=root,
-                    resources_dir=Path('/Users/franz/review/resources/review'),
-                    agents_dir=Path('/Users/franz/review/resources/agents'),
+                    resources_dir=REVIEW_RESOURCES_DIR,
+                    agents_dir=AGENTS_DIR,
                     enabled_cluster_pass_ids=(),
                 ),
             )
@@ -1368,8 +1372,8 @@ class UseCaseDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
                 agent=AgentConfig(base_url='http://localhost:1234/v1', api_key='secret', timeout_seconds=30),
                 review=ReviewConfig(
                     review_root=root,
-                    resources_dir=Path('/Users/franz/review/resources/review'),
-                    agents_dir=Path('/Users/franz/review/resources/agents'),
+                    resources_dir=REVIEW_RESOURCES_DIR,
+                    agents_dir=AGENTS_DIR,
                 ),
             )
             use_case = ReviewMergeRequestUseCase(
@@ -1436,8 +1440,8 @@ class UseCaseDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
                 agent=AgentConfig(base_url='http://localhost:1234/v1', api_key='secret', timeout_seconds=30),
                 review=ReviewConfig(
                     review_root=root,
-                    resources_dir=Path('/Users/franz/review/resources/review'),
-                    agents_dir=Path('/Users/franz/review/resources/agents'),
+                    resources_dir=REVIEW_RESOURCES_DIR,
+                    agents_dir=AGENTS_DIR,
                     translation_language='RUS',
                     parallel_translation_reviews=2,
                 ),
@@ -1547,8 +1551,8 @@ class UseCaseDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
                 agent=AgentConfig(base_url='http://localhost:1234/v1', api_key='secret', timeout_seconds=30),
                 review=ReviewConfig(
                     review_root=root,
-                    resources_dir=Path('/Users/franz/review/resources/review'),
-                    agents_dir=Path('/Users/franz/review/resources/agents'),
+                    resources_dir=REVIEW_RESOURCES_DIR,
+                    agents_dir=AGENTS_DIR,
                     translation_language='RUS',
                 ),
             )
@@ -1671,8 +1675,8 @@ class UseCaseDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
                 agent=AgentConfig(base_url='http://localhost:1234/v1', api_key='secret', timeout_seconds=30),
                 review=ReviewConfig(
                     review_root=root,
-                    resources_dir=Path('/Users/franz/review/resources/review'),
-                    agents_dir=Path('/Users/franz/review/resources/agents'),
+                    resources_dir=REVIEW_RESOURCES_DIR,
+                    agents_dir=AGENTS_DIR,
                     translation_language='DE',
                 ),
             )

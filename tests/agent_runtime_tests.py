@@ -8,9 +8,13 @@ from pathlib import Path
 from infrastructure.agents.openai_runner import AgentRunner
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+AGENTS_DIR = PROJECT_ROOT / 'resources' / 'agents'
+
+
 class AgentRunnerTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        self.agents_dir = Path('/Users/franz/review/resources/agents')
+        self.agents_dir = AGENTS_DIR
         self.runner = AgentRunner(
             base_url='https://example.invalid/v1',
             api_key='test-key',

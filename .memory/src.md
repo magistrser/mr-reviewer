@@ -119,6 +119,8 @@ translation result JSON.
 - Keep review agents constrained to provided inputs and generated contexts.
 - Do not reintroduce the old `src` package or `src.*` imports.
 - Keep tests named `*_tests.py`; `pytest.ini` intentionally ignores `python_template/`.
+- Tests must derive repository paths from `Path(__file__).resolve().parents[1]`; do not hard-code developer
+  workstation checkout paths because GitHub Actions checks out the repo elsewhere.
 - Use `PYTHONPYCACHEPREFIX=/tmp/mr-review-pyc` during local verification to avoid writing caches into source packages.
 
 ## CLI troubleshooting
