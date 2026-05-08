@@ -121,6 +121,8 @@ translation result JSON.
 - Keep tests named `*_tests.py`; `pytest.ini` intentionally ignores `python_template/`.
 - Tests must derive repository paths from `Path(__file__).resolve().parents[1]`; do not hard-code developer
   workstation checkout paths because GitHub Actions checks out the repo elsewhere.
+- Tests for Rich live TTY output should assert `ConsoleReviewOutput` live state/sealing behavior rather than
+  exact captured stdout emptiness; Rich versions differ on whether fake TTY streams receive escape-rendered frames.
 - Use `PYTHONPYCACHEPREFIX=/tmp/mr-review-pyc` during local verification to avoid writing caches into source packages.
 
 ## CLI troubleshooting

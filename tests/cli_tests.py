@@ -127,7 +127,7 @@ class CliSummaryTests(unittest.TestCase):
                 parallel_limit=2,
             )
         )
-        self.assertEqual(stdout.getvalue(), '')
+        self.assertTrue(output._live is not None or output._live_lines is not None)
         output.task_progress(
             TaskProgress(
                 stage_label='Review pass',
@@ -139,8 +139,10 @@ class CliSummaryTests(unittest.TestCase):
                 parallel_limit=2,
             )
         )
-        self.assertEqual(stdout.getvalue(), '')
+        self.assertTrue(output._live is not None or output._live_lines is not None)
         output.step_started(6, 8, 'Run cluster review passes')
+        self.assertIsNone(output._live)
+        self.assertIsNone(output._live_lines)
 
         text = stdout.getvalue()
 
