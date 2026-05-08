@@ -3,14 +3,164 @@ api:
   settings_path: settings.dev.yml
   max_concurrent_jobs: 1
 
+$version: 3
+
 security:
   auth:
     baseUrl: http://localhost:11434/v1
+    apiKey: ""
 
 model:
   generationConfig:
-    timeout: 300000
+    timeout: 2400000
 
 review:
-  parallelReviews: 1
-  parallelClusterReviews: 1
+  parallelReviews: 4
+  parallelClusterReviews: 2
+  dedup:
+    lineWindow: 3
+    parallelReviews: 2
+  translation:
+    language: RU
+    parallelReviews: 4
+  indexing:
+    enabled: true
+    maxCatalogFileBytes: 131072
+    maxRetrievedArtifactsPerTask: 3
+    maxRetrievedCharsPerTask: 2500
+    maxRetrievedLinesPerArtifact: 80
+    filePolicies:
+      security:
+        enabled: true
+        allowedKinds:
+          - import_owner
+          - service_partner
+          - symbol_definition
+        hintSelection: exactly_one
+        minScore: 85
+        requireUniqueTop: true
+        maxArtifacts: 1
+        maxChars: 2500
+        maxLinesPerArtifact: 80
+      async:
+        enabled: true
+        allowedKinds:
+          - async_partner
+          - import_owner
+          - service_partner
+        hintSelection: exactly_one
+        minScore: 85
+        requireUniqueTop: true
+        maxArtifacts: 1
+        maxChars: 2500
+        maxLinesPerArtifact: 80
+    clusterPolicies:
+      security:
+        enabled: true
+        allowedKinds:
+          - async_partner
+          - import_owner
+          - schema_partner
+          - service_partner
+          - symbol_definition
+        hintSelection: first_n
+        minScore: 55
+        requireUniqueTop: false
+        maxArtifacts: 3
+        maxChars: 2500
+        maxLinesPerArtifact: 80
+      api_boundary:
+        enabled: true
+        allowedKinds:
+          - async_partner
+          - import_owner
+          - schema_partner
+          - service_partner
+          - symbol_definition
+        hintSelection: first_n
+        minScore: 55
+        requireUniqueTop: false
+        maxArtifacts: 3
+        maxChars: 2500
+        maxLinesPerArtifact: 80
+      data_integrity:
+        enabled: true
+        allowedKinds:
+          - async_partner
+          - import_owner
+          - schema_partner
+          - service_partner
+          - symbol_definition
+        hintSelection: first_n
+        minScore: 55
+        requireUniqueTop: false
+        maxArtifacts: 3
+        maxChars: 2500
+        maxLinesPerArtifact: 80
+      async_concurrency:
+        enabled: true
+        allowedKinds:
+          - async_partner
+          - import_owner
+          - schema_partner
+          - service_partner
+          - symbol_definition
+        hintSelection: first_n
+        minScore: 55
+        requireUniqueTop: false
+        maxArtifacts: 3
+        maxChars: 2500
+        maxLinesPerArtifact: 80
+      architecture:
+        enabled: true
+        allowedKinds:
+          - async_partner
+          - import_owner
+          - schema_partner
+          - service_partner
+          - symbol_definition
+        hintSelection: first_n
+        minScore: 55
+        requireUniqueTop: false
+        maxArtifacts: 3
+        maxChars: 2500
+        maxLinesPerArtifact: 80
+  passes:
+    file:
+      enabled:
+        - correctness
+        - security
+        - async
+        - python
+        - rust
+        - typescript
+        - javascript
+    cluster:
+      enabled:
+        - security
+        - api_boundary
+        - data_integrity
+        - async_concurrency
+        - architecture
+  context:
+    scale: 2
+    maxContextChars: 28000
+    maxClusterContextChars: 30000
+    maxSymbolBlocks: 4
+    maxSymbolLines: 80
+    clusterExcerptRadius: 4
+    clusterMaxSegments: 2
+    sectionChars:
+      reviewGoal: 400
+      projectProfile: 1800
+      prSummary: 1600
+      fileProfile: 1400
+      excerpt: 4200
+      imports: 900
+      symbols: 4200
+      reviewPlan: 2800
+      standards: 18000
+      severity: 900
+      template: 1200
+      clusterIntro: 1400
+      clusterFile: 3200

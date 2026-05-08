@@ -81,6 +81,11 @@ The review config loader accepts YAML only. CLI default resolution:
 - `<review-root>/settings.yml` if it exists
 - otherwise root `settings.dev.yml`
 
+`settings.dev.yml` is the committed development/template config. It intentionally mirrors the full local
+`settings.yml` review tuning shape so new environments can see every supported knob, but it must not contain real
+agent credentials or private endpoint details. Keep `security.auth.baseUrl` on a localhost/example endpoint and
+`security.auth.apiKey` empty; real values should come from `.env` or process environment.
+
 Secrets should not be committed. Use `.env` or environment variables:
 
 - `GITLAB_TOKEN`
