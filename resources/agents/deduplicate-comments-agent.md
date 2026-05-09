@@ -25,6 +25,9 @@ The input JSON contains:
 `group` contains:
 - `group_id`
 - `file_path`
+- `focus_area`
+- `focus_areas`
+- `source_passes`
 - `line_window`
 - `start_line`
 - `end_line`
@@ -61,7 +64,14 @@ Return the unique new comment indexes for this one nearby-line group.
 Treat comments as duplicates when they describe the same defect on the same file in this nearby window, even if:
 - the wording differs
 - the anchor line is slightly different inside the window
+- the comments came from different review lenses, such as `correctness`, `rust`, or `async_concurrency`
+- the `rule_ids`, `dedup_key`, title wording, or dedup suffixes differ
 - one comment is broader and another is narrower but they still point to the same underlying issue
+
+Treat `rule_ids`, `dedup_key`, and title suffixes as weak metadata only. Do not require exact matches on those
+fields. Treat `focus_area`, `focus_areas`, `source_pass`, and `source_passes` as context about which lens found the
+comment, not as hard partition keys. Judge semantic equivalence from the nearby file anchors, body, evidence,
+impact, and the underlying defect being described.
 
 If a new comment duplicates an existing PR comment, drop the new comment.
 

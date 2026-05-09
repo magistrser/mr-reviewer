@@ -113,11 +113,16 @@ translation result JSON.
 
 ## Deduplication
 
-Publish-time finding deduplication intentionally does not rely on exact `dedup_key` or `rule_ids` matches. Different
-models often describe the same issue with different rule IDs, titles, or dedup suffixes. `CommentDedupPlanner`
-therefore groups candidates by target file, `focus_area`, and configured nearby-line window before asking the
-dedup agent to judge semantic equivalence from body, evidence, impact, anchors, and the underlying defect. Keep
-`dedup_key` in artifacts for traceability only.
+Final finding deduplication deliberately groups by file plus the configured nearby-line window, not by
+`focus_area`, `source_pass`, `rule_ids`, or `dedup_key`. Those fields are weak metadata used as context by the
+dedup agent, because the same defect can surface through several review lenses such as correctness, language, and
+async/concurrency. Dedup inputs and reports include group-level `focus_areas` and `source_passes` so this merge is
+auditable without preventing semantic cross-pass collapse.
+
+Only agent-authored JSON artifacts use tolerant JSON repair. `domain.review.agent_json.AgentJsonArtifactParser`
+first tries strict JSON, then recovers common model-output mistakes such as Markdown fences, prose around the JSON
+value, and raw newline/tab characters inside JSON strings. Keep config, progress, and other system-owned JSON on
+strict parsing so corruption is not hidden.
 
 ## Repo indexing and retrieval
 
@@ -168,14 +173,13 @@ detail line to identify whether the agent endpoint, GitLab API, or git workspace
 
 ## Verification
 
-Verified on 2026-05-08 with `uv sync` and Python 3.14.4:
+Verified on 2026-05-09 with Python 3.14.4:
 
-- `flake8`
-- `mypy .`
-- `pytest -s --color=yes --junitxml=report.xml --cov=application --cov=domain --cov=infrastructure --cov-config=.coverage_conf --cov-fail-under 70`
+- `.venv/bin/flake8`
+- `.venv/bin/mypy .`
+- `PYTHONPYCACHEPREFIX=/tmp/mr-review-pyc .venv/bin/pytest -q`
 
-After the resumable workspace implementation and OpenAI-compatible tool-call finish-reason fix, quick verification
-passed with 114 tests.
+After the cross-pass deduplication and agent JSON repair implementation, quick verification passed with 123 tests.
 
 Note: `mypy.ini` excludes tests and quarantines several older dynamic modules with `ignore_errors`. That preserves
 the template gate while leaving a clear future cleanup target for deeper TypedDict/UI hardening.

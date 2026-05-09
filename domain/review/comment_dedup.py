@@ -35,6 +35,8 @@ class CommentDedupPlanner:
             {
                 'index': index,
                 'file_path': cls.finding_path(finding),
+                'focus_area': cls.finding_focus_area(finding),
+                'source_pass': cls.finding_source_pass(finding),
                 'line': cls.finding_line(finding),
                 'finding': finding,
             }
@@ -61,24 +63,44 @@ class CommentDedupPlanner:
                 if line is None:
                     if current:
                         groups.append(
-                            cls._materialize_group(file_path, current, existing_by_path[file_path], line_window)
+                            cls._materialize_group(
+                                file_path,
+                                current,
+                                existing_by_path[file_path],
+                                line_window,
+                            )
                         )
                         current = []
                     groups.append(
-                        cls._materialize_group(file_path, [item], existing_by_path[file_path], line_window)
+                        cls._materialize_group(
+                            file_path,
+                            [item],
+                            existing_by_path[file_path],
+                            line_window,
+                        )
                     )
                     last_line = None
                     continue
                 if current and last_line is not None and line - last_line > line_window:
                     groups.append(
-                        cls._materialize_group(file_path, current, existing_by_path[file_path], line_window)
+                        cls._materialize_group(
+                            file_path,
+                            current,
+                            existing_by_path[file_path],
+                            line_window,
+                        )
                     )
                     current = []
                 current.append(item)
                 last_line = line
             if current:
                 groups.append(
-                    cls._materialize_group(file_path, current, existing_by_path[file_path], line_window)
+                    cls._materialize_group(
+                        file_path,
+                        current,
+                        existing_by_path[file_path],
+                        line_window,
+                    )
                 )
 
         groups.sort(key=lambda item: item[0])
@@ -99,6 +121,16 @@ class CommentDedupPlanner:
         return int(old_line) if old_line is not None else None
 
     @classmethod
+    def finding_focus_area(cls, finding: Finding) -> str:
+        focus_area = str(finding.get('focus_area', '')).strip()
+        return focus_area or 'unknown'
+
+    @classmethod
+    def finding_source_pass(cls, finding: Finding) -> str:
+        source_pass = str(finding.get('source_pass', '')).strip()
+        return source_pass or cls.finding_focus_area(finding)
+
+    @classmethod
     def _materialize_group(
         cls,
         file_path: str,
@@ -107,6 +139,8 @@ class CommentDedupPlanner:
         line_window: int,
     ) -> tuple[int, dict]:
         group_lines = [int(item['line']) for item in items if item['line'] is not None]
+        focus_areas = sorted({str(item['focus_area']) for item in items})
+        source_passes = sorted({str(item['source_pass']) for item in items})
         nearby_existing = [
             {
                 'note_id': comment.get('note_id'),
@@ -122,6 +156,9 @@ class CommentDedupPlanner:
         return earliest_index, {
             'group_id': f'group_{earliest_index:03d}',
             'file_path': file_path,
+            'focus_area': focus_areas[0] if len(focus_areas) == 1 else '',
+            'focus_areas': focus_areas,
+            'source_passes': source_passes,
             'line_window': line_window,
             'start_line': min(group_lines) if group_lines else None,
             'end_line': max(group_lines) if group_lines else None,
@@ -136,8 +173,8 @@ class CommentDedupPlanner:
                     'body': item['finding'].get('body', ''),
                     'evidence': item['finding'].get('evidence', ''),
                     'impact': item['finding'].get('impact', ''),
-                    'focus_area': item['finding'].get('focus_area', ''),
-                    'source_pass': item['finding'].get('source_pass', ''),
+                    'focus_area': item['focus_area'],
+                    'source_pass': item['source_pass'],
                     'source_kind': item['finding'].get('source_kind', ''),
                     'dedup_key': item['finding'].get('dedup_key', ''),
                     'anchor': item['finding'].get('anchor', {}),
