@@ -8,6 +8,7 @@ from pathlib import Path
 from application.dto import TaskProgress, TaskProgressItem
 from application.ports import AgentPort, ReviewOutputPort
 from domain.models import ExistingComment, Finding
+from domain.review.agent_json import AgentJsonArtifactParser
 from domain.review.comment_dedup import CommentDedupPlanner
 from domain.workspace import WorkspacePaths
 from runtime.async_ops import AsyncPathIO
@@ -27,6 +28,7 @@ class DedupGroupOutcome:
     keep_indexes: list[int]
     duplicates_by_index: dict[int, dict]
     anomaly: str | None = None
+    repair_notes: tuple[str, ...] = ()
 
 
 class ReviewCommentDeduplicator:
@@ -99,6 +101,10 @@ class ReviewCommentDeduplicator:
             duplicates_by_index = outcome.duplicates_by_index
             if outcome.anomaly:
                 anomalies.append(outcome.anomaly)
+            if outcome.repair_notes:
+                anomalies.append(
+                    f'{group["group_id"]}: repaired dedup result ({", ".join(outcome.repair_notes)})'
+                )
             keep_indexes.update(group_keep_indexes)
             valid_indexes = {
                 int(comment['index'])
@@ -128,6 +134,9 @@ class ReviewCommentDeduplicator:
                 {
                     'group_id': group['group_id'],
                     'file_path': group['file_path'],
+                    'focus_area': group.get('focus_area', ''),
+                    'focus_areas': group.get('focus_areas', []),
+                    'source_passes': group.get('source_passes', []),
                     'start_line': group.get('start_line'),
                     'end_line': group.get('end_line'),
                     'new_comment_indexes': sorted(valid_indexes),
@@ -139,6 +148,7 @@ class ReviewCommentDeduplicator:
                         if comment.get('note_id') is not None
                     ],
                     'result_path': str(result_path),
+                    'result_repair_notes': list(outcome.repair_notes),
                 }
             )
 
@@ -228,31 +238,43 @@ class ReviewCommentDeduplicator:
                         output.task_progress(_task_progress('started', task_item))
                 try:
                     await agent.run('deduplicate-comments-agent', str(job.input_path), model)
-                    if not await AsyncPathIO.exists(job.result_path):
-                        raise RuntimeError(f'dedup agent did not write {job.result_path.name}')
-                    result = await AsyncPathIO.read_json(job.result_path)
-                    keep_indexes, duplicates_by_index = cls._parse_group_result(job.group, result)
+                    keep_indexes, duplicates_by_index, repair_notes = await cls._load_group_result(job)
                     outcome = DedupGroupOutcome(
                         group=job.group,
                         keep_indexes=keep_indexes,
                         duplicates_by_index=duplicates_by_index,
+                        repair_notes=repair_notes,
                     )
-                except Exception as exc:
-                    outcome = DedupGroupOutcome(
-                        group=job.group,
-                        keep_indexes=[
-                            int(comment['index'])
-                            for comment in job.group.get('new_comments', [])
-                        ],
-                        duplicates_by_index={},
-                        anomaly=f'{job.group["group_id"]}: dedup skipped ({exc})',
-                    )
-                    if output is not None:
-                        async with progress_lock:
-                            active_tasks.pop(job.ordinal, None)
-                            completed_count += 1
-                            output.task_progress(_task_progress('failed', task_item))
-                    return outcome
+                except Exception as first_exc:
+                    try:
+                        await agent.run('deduplicate-comments-agent', str(job.input_path), model)
+                        keep_indexes, duplicates_by_index, repair_notes = await cls._load_group_result(job)
+                        outcome = DedupGroupOutcome(
+                            group=job.group,
+                            keep_indexes=keep_indexes,
+                            duplicates_by_index=duplicates_by_index,
+                            anomaly=(
+                                f'{job.group["group_id"]}: dedup result accepted after retry '
+                                f'({first_exc})'
+                            ),
+                            repair_notes=repair_notes,
+                        )
+                    except Exception as exc:
+                        outcome = DedupGroupOutcome(
+                            group=job.group,
+                            keep_indexes=[
+                                int(comment['index'])
+                                for comment in job.group.get('new_comments', [])
+                            ],
+                            duplicates_by_index={},
+                            anomaly=f'{job.group["group_id"]}: dedup skipped ({exc})',
+                        )
+                        if output is not None:
+                            async with progress_lock:
+                                active_tasks.pop(job.ordinal, None)
+                                completed_count += 1
+                                output.task_progress(_task_progress('failed', task_item))
+                        return outcome
 
                 if output is not None:
                     async with progress_lock:
@@ -268,15 +290,29 @@ class ReviewCommentDeduplicator:
         if not await AsyncPathIO.exists(job.result_path):
             return None
         try:
-            result = await AsyncPathIO.read_json(job.result_path)
-            keep_indexes, duplicates_by_index = cls._parse_group_result(job.group, result)
+            keep_indexes, duplicates_by_index, repair_notes = await cls._load_group_result(job)
         except Exception:
             return None
         return DedupGroupOutcome(
             group=job.group,
             keep_indexes=keep_indexes,
             duplicates_by_index=duplicates_by_index,
+            repair_notes=repair_notes,
         )
+
+    @classmethod
+    async def _load_group_result(
+        cls,
+        job: DedupGroupJob,
+    ) -> tuple[list[int], dict[int, dict], tuple[str, ...]]:
+        if not await AsyncPathIO.exists(job.result_path):
+            raise RuntimeError(f'dedup agent did not write {job.result_path.name}')
+        text = await AsyncPathIO.read_text(job.result_path)
+        parsed = AgentJsonArtifactParser.parse(text)
+        if not isinstance(parsed.payload, dict):
+            raise ValueError('dedup result must be a JSON object')
+        keep_indexes, duplicates_by_index = cls._parse_group_result(job.group, parsed.payload)
+        return keep_indexes, duplicates_by_index, parsed.repair_notes
 
     @classmethod
     def _group_activity(cls, group: dict) -> str:

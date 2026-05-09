@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from domain.models import Finding, SEVERITY_ORDER
+from domain.review.agent_json import AgentJsonArtifactParser
 from domain.review.validate import FindingValidator
 from runtime.async_ops import AsyncPathIO
 
@@ -32,7 +33,14 @@ class FindingsConsolidator:
             )
             for path in entries:
                 try:
-                    data = await AsyncPathIO.read_json(path)
+                    parsed = AgentJsonArtifactParser.parse(await AsyncPathIO.read_text(path))
+                    data = parsed.payload
+                    if not isinstance(data, dict):
+                        raise ValueError('findings payload must be a JSON object')
+                    if parsed.repair_notes:
+                        anomalies.append(
+                            f'{path.name}: recovered malformed JSON ({", ".join(parsed.repair_notes)})'
+                        )
                     normalized, file_anomalies = FindingValidator.normalize_batch(data, path.name)
                     all_findings.extend(normalized)
                     invalid += max(len(data.get('findings', [])) - len(normalized), 0)
